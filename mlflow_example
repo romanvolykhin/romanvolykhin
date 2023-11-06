@@ -1,0 +1,47 @@
+import mlflow
+#https://github.com/MobileTeleSystems/RecTools/blob/main/examples/5_benchmark_iALS_with_features.ipynb
+os.environ['MLFLOW_EXPERIMENT_NAME'] = 'Training recommender'
+os.environ['MLFLOW_TRACKING_URI'] = ## set url here
+
+# Best grid search params for pure iALS models
+factors_options = (32, 64, 128)
+ALPHA = 1
+REG = 0.5
+
+# We have two options for training iALS with features in RecTools
+fit_features_together = (True, False)
+
+# We have datasets with different feature selections
+feature_datasets.keys()
+
+
+features_results = []
+for dataset_name, dataset in feature_datasets.items():
+    for n_factors in factors_options:
+        for features_option in fit_features_together:
+            with mlflow.start_run() as mlrun:
+                run_name = f"{dataset_name}_factors_{n_factors}_fit_together_{features_option}"
+                mlflow.set_tag("mlflow.runName", run_name)
+                model_name = f"{dataset_name}_factors_{n_factors}_fit_together_{features_option}"
+                model = make_base_model(factors = n_factors, regularization=REG, alpha=ALPHA, fit_features_together=features_option)
+                model.fit(dataset)
+                recos = model.recommend(
+                    users=test_users,
+                    dataset=dataset,
+                    k=K_RECOS,
+                    filter_viewed=True,
+                )
+                metric_values = calc_metrics(metrics, recos, test, train, catalog)
+                metric_values["model"] = model_name
+                features_results.append(metric_values)
+                mlflow_send = {}
+                #hack for 
+                for key in metric_values.keys():
+                    mlflow_send[key.replace('@', 'at')] = metric_values[key]
+                del mlflow_send['model']
+                mlflow.log_metrics(mlflow_send)
+                mlflow.log_params({"factors_options":factors_options, 
+                                    'alpha':ALPHA,
+                                    'with_items':fit_features_together,
+                                   'dataset_name':dataset_name})
+            mlflow.end_run()
